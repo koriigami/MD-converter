@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
-const HTMLtoDOCX = require('html-to-docx');
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, convertInchesToTwip } = require('docx');
 const { marked } = require('marked');
 const { getTemplate } = require('./templateRegistry');
 
@@ -28,17 +28,52 @@ async function convert({ inputPath, templateId, format, outputPath }) {
 
 async function convertToDocx({ inputPath, template, outputPath }) {
   const mdText = fs.readFileSync(inputPath, 'utf8');
-  const css = fs.readFileSync(template.cssPath, 'utf8');
-  const bodyHtml = marked.parse(mdText);
-  const fullHtml = `<!DOCTYPE html><html><head><style>${css}</style></head><body>${bodyHtml}</body></html>`;
+  const tokens = marked.lexer(mdText);
+  const primaryFont = template.fonts.split('+')[0].trim();
 
-  const docxBuffer = await HTMLtoDOCX(fullHtml, null, {
-    font: template.fonts.split('+')[0].trim(),
-    fontSize: 24,
-    margins: { top: 1080, right: 1080, bottom: 1080, left: 1080 },
+  // Parse markdown tokens into Word paragraphs
+  const paragraphs = [];
+  for (const token of tokens) {
+    if (token.type === 'heading') {
+      const level = token.depth === 1 ? HeadingLevel.HEADING_1 : token.depth === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
+      paragraphs.push(new Paragraph({
+        text: token.text,
+        heading: level,
+        spacing: { after: 200 },
+      }));
+    } else if (token.type === 'paragraph') {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: token.text, font: primaryFont })],
+        spacing: { after: 100 },
+      }));
+    } else if (token.type === 'list') {
+      for (const item of token.items) {
+        paragraphs.push(new Paragraph({
+          children: [new TextRun({ text: `• ${item.text}`, font: primaryFont })],
+          spacing: { after: 50 },
+        }));
+      }
+    } else if (token.type === 'code') {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: token.text, font: 'Courier New' })],
+        spacing: { after: 100 },
+      }));
+    }
+  }
+
+  const doc = new Document({
+    sections: [{
+      properties: {
+        page: {
+          margins: { top: convertInchesToTwip(1), bottom: convertInchesToTwip(1), left: convertInchesToTwip(1), right: convertInchesToTwip(1) },
+        },
+      },
+      children: paragraphs.length > 0 ? paragraphs : [new Paragraph('Empty document')],
+    }],
   });
 
-  fs.writeFileSync(outputPath, docxBuffer);
+  const buffer = await Packer.toBuffer(doc);
+  fs.writeFileSync(outputPath, buffer);
 }
 
 async function convertToPdf({ inputPath, template, outputPath }) {
