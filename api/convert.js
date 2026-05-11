@@ -47,26 +47,24 @@ module.exports = async (req, res) => {
             return resolve();
           }
 
-          if (!['docx', 'pdf'].includes(format)) {
-            res.status(400).json({ error: 'format must be "docx" or "pdf"' });
+          // Only support DOCX on Vercel for now (PDF requires Puppeteer/Chromium which may fail)
+          if (format !== 'docx') {
+            res.status(400).json({ error: 'Only DOCX format is supported' });
             return resolve();
           }
 
           const inputPath = path.join(os.tmpdir(), `md-${Date.now()}.md`);
-          const ext = format === 'docx' ? 'docx' : 'pdf';
-          const outputPath = path.join(os.tmpdir(), `converted-${Date.now()}.${ext}`);
+          const outputPath = path.join(os.tmpdir(), `converted-${Date.now()}.docx`);
 
           fs.writeFileSync(inputPath, mdText, 'utf8');
 
-          await convert({ inputPath, templateId: template, format, outputPath });
+          await convert({ inputPath, templateId: template, format: 'docx', outputPath });
 
           const fileBuffer = fs.readFileSync(outputPath);
-          const mimeType = format === 'docx'
-            ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-            : 'application/pdf';
+          const mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
           res.setHeader('Content-Type', mimeType);
-          res.setHeader('Content-Disposition', `attachment; filename="document.${ext}"`);
+          res.setHeader('Content-Disposition', 'attachment; filename="document.docx"');
           res.send(fileBuffer);
 
           fs.rmSync(inputPath, { force: true });
@@ -74,12 +72,14 @@ module.exports = async (req, res) => {
 
           resolve();
         } catch (err) {
+          console.error('Convert error:', err);
           res.status(500).json({ error: err.message });
           resolve();
         }
       });
 
       bb.on('error', (err) => {
+        console.error('Busboy error:', err);
         res.status(400).json({ error: err.message });
         resolve();
       });
@@ -87,6 +87,7 @@ module.exports = async (req, res) => {
       req.pipe(bb);
     });
   } catch (err) {
+    console.error('Handler error:', err);
     res.status(500).json({ error: err.message });
   }
 };
