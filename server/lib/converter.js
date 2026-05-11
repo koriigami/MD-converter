@@ -1,12 +1,10 @@
-const { execFile } = require('child_process');
-const { promisify } = require('util');
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
+const HTMLtoDOCX = require('html-to-docx');
 const { marked } = require('marked');
 const { getTemplate } = require('./templateRegistry');
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Convert a markdown file to DOCX or PDF.
@@ -29,50 +27,31 @@ async function convert({ inputPath, templateId, format, outputPath }) {
 }
 
 async function convertToDocx({ inputPath, template, outputPath }) {
-  const args = [
-    inputPath,
-    '--from', 'markdown',
-    '--to', 'docx',
-    '--reference-doc', template.referenceDocPath,
-    '--output', outputPath,
-  ];
+  const mdText = fs.readFileSync(inputPath, 'utf8');
+  const css = fs.readFileSync(template.cssPath, 'utf8');
+  const bodyHtml = marked.parse(mdText);
+  const fullHtml = `<!DOCTYPE html><html><head><style>${css}</style></head><body>${bodyHtml}</body></html>`;
 
-  try {
-    await execFileAsync('pandoc', args);
-  } catch (err) {
-    throw new Error(`Pandoc DOCX conversion failed: ${err.message}`);
-  }
+  const docxBuffer = await HTMLtoDOCX(fullHtml, null, {
+    font: template.fonts.split('+')[0].trim(),
+    fontSize: 24,
+    margins: { top: 1080, right: 1080, bottom: 1080, left: 1080 },
+  });
+
+  fs.writeFileSync(outputPath, docxBuffer);
 }
 
 async function convertToPdf({ inputPath, template, outputPath }) {
-  // Step 1: pandoc → HTML (standalone, no external CSS link)
-  const htmlArgs = [
-    inputPath,
-    '--from', 'markdown',
-    '--to', 'html5',
-    '--standalone',
-    '--output', '-',   // stdout
-  ];
-
-  let rawHtml;
-  try {
-    const { stdout } = await execFileAsync('pandoc', htmlArgs);
-    rawHtml = stdout;
-  } catch (err) {
-    throw new Error(`Pandoc HTML conversion failed: ${err.message}`);
-  }
-
-  // Step 2: inject template CSS into the HTML
+  const mdText = fs.readFileSync(inputPath, 'utf8');
   const css = fs.readFileSync(template.cssPath, 'utf8');
-  const styledHtml = rawHtml.replace(
-    '</head>',
-    `<style>\n${css}\n</style>\n</head>`
-  );
+  const bodyHtml = marked.parse(mdText);
+  const styledHtml = `<!DOCTYPE html><html><head><style>${css}</style></head><body class="preview-body"><div class="doc-content">${bodyHtml}</div></body></html>`;
 
-  // Step 3: Puppeteer → PDF
   const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
   });
 
   try {

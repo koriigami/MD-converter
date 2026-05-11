@@ -10,8 +10,10 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.use('/api', require('./routes/convert'));
 
-app.listen(PORT, () => {
-  console.log(`MD Converter running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`MD Converter running at http://localhost:${PORT}`);
+  });
+}
 
 module.exports = app;
