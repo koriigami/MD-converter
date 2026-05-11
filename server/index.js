@@ -8,7 +8,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-app.use('/api', require('./routes/convert'));
+// Mount routes at both /api and root (for Vercel serverless compatibility)
+const convertRoutes = require('./routes/convert');
+app.use('/api', convertRoutes);
+app.use(convertRoutes);
 
 if (require.main === module) {
   app.listen(PORT, () => {
