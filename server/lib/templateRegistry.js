@@ -1,0 +1,183 @@
+const path = require('path');
+
+const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates');
+
+const templates = [
+  {
+    id: 'slate-pro',
+    name: 'Slate Pro',
+    vibe: 'Clean professional default',
+    fonts: 'Inter',
+    accent: '#2D3A4A',
+    accentLabel: 'Dark Slate',
+  },
+  {
+    id: 'midnight-navy',
+    name: 'Midnight Navy',
+    vibe: 'Corporate, premium',
+    fonts: 'Playfair Display + Source Sans 3',
+    accent: '#1A2744',
+    uiAccent: '#4A6FA5',
+    accentLabel: 'Deep Navy',
+  },
+  {
+    id: 'forest-brief',
+    name: 'Forest Brief',
+    vibe: 'Natural, consultancy',
+    fonts: 'DM Sans',
+    accent: '#1E4D3B',
+    uiAccent: '#3D8A68',
+    accentLabel: 'Forest Green',
+  },
+  {
+    id: 'obsidian',
+    name: 'Obsidian',
+    vibe: 'Minimal, technical',
+    fonts: 'JetBrains Mono + Inter',
+    accent: '#1C1C1E',
+    uiAccent: '#6A7A8A',
+    accentLabel: 'Near Black',
+  },
+  {
+    id: 'warm-ivory',
+    name: 'Warm Ivory',
+    vibe: 'Editorial, long-form',
+    fonts: 'Lora + Source Serif 4',
+    accent: '#7A5C3E',
+    accentLabel: 'Warm Tan',
+  },
+  {
+    id: 'latte',
+    name: 'Latte',
+    vibe: 'Cozy, lifestyle editorial',
+    fonts: 'Playfair Display + Lato',
+    accent: '#6B4A2A',
+    accentLabel: 'Coffee Brown',
+  },
+  {
+    id: 'solar',
+    name: 'Solar',
+    vibe: 'Startup-y, energetic',
+    fonts: 'Space Grotesk',
+    accent: '#E07B1A',
+    accentLabel: 'Amber',
+  },
+  {
+    id: 'crimson-edge',
+    name: 'Crimson Edge',
+    vibe: 'Bold, reports, impact',
+    fonts: 'Montserrat + Georgia',
+    accent: '#B81C1C',
+    accentLabel: 'Crimson',
+  },
+  {
+    id: 'sage-calm',
+    name: 'Sage Calm',
+    vibe: 'Wellness, lifestyle',
+    fonts: 'Nunito + Lora',
+    accent: '#5A7A5C',
+    accentLabel: 'Sage Green',
+  },
+  {
+    id: 'violet-pulse',
+    name: 'Violet Pulse',
+    vibe: 'Creative briefs, branding',
+    fonts: 'DM Sans',
+    accent: '#5B3FA6',
+    accentLabel: 'Violet',
+  },
+  {
+    id: 'arctic',
+    name: 'Arctic',
+    vibe: 'Light, clean tech',
+    fonts: 'Inter',
+    accent: '#1A7BB4',
+    accentLabel: 'Sky Blue',
+  },
+  {
+    id: 'ink-press',
+    name: 'Ink Press',
+    vibe: 'Magazine editorial',
+    fonts: 'Playfair Display',
+    accent: '#111111',
+    uiAccent: '#8A7A6A',
+    accentLabel: 'Ink Black',
+  },
+  {
+    id: 'blush-rose',
+    name: 'Blush Rose',
+    vibe: 'Lifestyle, fashion',
+    fonts: 'Cormorant Garamond + Lato',
+    accent: '#C2687A',
+    accentLabel: 'Rose Pink',
+  },
+  {
+    id: 'emerald-report',
+    name: 'Emerald Report',
+    vibe: 'Financial, structured',
+    fonts: 'IBM Plex Sans',
+    accent: '#1A6B4A',
+    uiAccent: '#3DAB7A',
+    accentLabel: 'Emerald',
+  },
+  {
+    id: 'sand-dune',
+    name: 'Sand Dune',
+    vibe: 'Consultancy, warm',
+    fonts: 'Raleway + Lora',
+    accent: '#A0845C',
+    accentLabel: 'Sand',
+  },
+  {
+    id: 'code-doc',
+    name: 'Code Doc',
+    vibe: 'Technical documentation',
+    fonts: 'JetBrains Mono + Inter',
+    accent: '#0D7377',
+    accentLabel: 'Teal',
+  },
+  {
+    id: 'portfolio-dark',
+    name: 'Portfolio Dark',
+    vibe: 'Dark mode, portfolio',
+    fonts: 'Space Grotesk',
+    accent: '#4A9EFF',
+    accentLabel: 'Electric Blue',
+  },
+  {
+    id: 'whisper',
+    name: 'Whisper',
+    vibe: 'Ultra-minimal, max whitespace',
+    fonts: 'Inter Light',
+    accent: '#888888',
+    accentLabel: 'Ghost Grey',
+  },
+  {
+    id: 'brass-bold',
+    name: 'Brass Bold',
+    vibe: 'Premium proposals',
+    fonts: 'Cormorant Garamond + Inter',
+    accent: '#B8960C',
+    accentLabel: 'Gold',
+  },
+  {
+    id: 'carbon',
+    name: 'Carbon',
+    vibe: 'Modern tech, dark charcoal',
+    fonts: 'Space Mono + Inter',
+    accent: '#00BCD4',
+    accentLabel: 'Cyan',
+  },
+];
+
+function getTemplate(id) {
+  const t = templates.find((t) => t.id === id);
+  if (!t) throw new Error(`Unknown template: "${id}"`);
+  return {
+    ...t,
+    referenceDocPath: path.join(TEMPLATES_DIR, t.id, 'reference.docx'),
+    cssPath: path.join(TEMPLATES_DIR, t.id, 'style.css'),
+  };
+}
+
+module.exports = { templates, getTemplate };
