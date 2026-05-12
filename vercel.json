@@ -3,6 +3,9 @@
   "functions": {
     "api/convert.js": {
       "maxDuration": 30
+    },
+    "api/preview.js": {
+      "maxDuration": 30
     }
   },
   "env": {
