@@ -1,6 +1,6 @@
 const { renderPreview } = require('../server/lib/converter');
 
-module.exports = (req, res) => {
+module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -17,7 +17,7 @@ module.exports = (req, res) => {
   }
 
   try {
-    const html = renderPreview(mdText, preset, palette, typography, accent);
+    const html = await renderPreview(mdText, preset, palette, typography, accent);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
   } catch (err) {

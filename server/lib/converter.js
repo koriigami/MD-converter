@@ -4,33 +4,18 @@ const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, convertInchesToTwip } = require('docx');
 
-let markedModule;
-try {
-  markedModule = require('marked');
-  // Try to get the parse function - it might be the default export or under .default or .marked
-} catch (err) {
-  throw new Error(`Failed to load marked: ${err.message}`);
-}
-
-const marked = {
-  parse: (text) => {
-    if (typeof markedModule.parse === 'function') {
-      return markedModule.parse(text);
-    } else if (typeof markedModule.default?.parse === 'function') {
-      return markedModule.default.parse(text);
-    } else if (typeof markedModule === 'function') {
-      return markedModule(text);
-    } else if (typeof markedModule.default === 'function') {
-      return markedModule.default(text);
-    }
-    throw new Error('Cannot find marked.parse function');
-  }
-};
-
 const PRESETS = require('./presetConfig');
 const PALETTES = require('./paletteConfig');
 const TYPOGRAPHY = require('./typographyConfig');
 const { composeCss } = require('./cssComposer');
+
+let cachedMarked;
+async function getMarked() {
+  if (!cachedMarked) {
+    cachedMarked = await import('marked');
+  }
+  return cachedMarked;
+}
 
 /**
  * Convert a markdown file to DOCX or PDF.
@@ -65,7 +50,8 @@ async function convert({ mdText, presetId, paletteId, typographyId, accent, form
 }
 
 async function convertToDocx({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath }) {
-  const tokens = marked.lexer(mdText);
+  const markedModule = await getMarked();
+  const tokens = markedModule.lexer(mdText);
   const typography = TYPOGRAPHY[effectiveTypographyId];
   const primaryFont = typography.bodyFont.replace(/['\"]/g, '');
 
@@ -121,7 +107,8 @@ async function convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTyp
     accent: effectiveAccent,
     isDark,
   });
-  const bodyHtml = marked.parse(mdText);
+  const markedModule = await getMarked();
+  const bodyHtml = markedModule.parse(mdText);
   const styledHtml = `<!DOCTYPE html><html><head><style>${css}</style></head><body class="preview-body"><div class="doc-content">${bodyHtml}</div></body></html>`;
 
   const browser = await puppeteer.launch({
@@ -152,9 +139,9 @@ async function convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTyp
  * @param {string} [paletteId] - Optional palette override
  * @param {string} [typographyId] - Optional typography override
  * @param {string} [accent] - Optional accent override
- * @returns {string} Full HTML with composed CSS injected
+ * @returns {Promise<string>} Full HTML with composed CSS injected
  */
-function renderPreview(mdText, presetId, paletteId, typographyId, accent) {
+async function renderPreview(mdText, presetId, paletteId, typographyId, accent) {
   const preset = PRESETS[presetId];
   if (!preset) {
     return `<html><body style="color: red;">Error: Unknown preset ${presetId}</body></html>`;
@@ -171,7 +158,8 @@ function renderPreview(mdText, presetId, paletteId, typographyId, accent) {
     isDark: preset.isDark,
   });
 
-  const bodyHtml = marked.parse(mdText);
+  const markedModule = await getMarked();
+  const bodyHtml = markedModule.parse(mdText);
 
   return `<!DOCTYPE html>
 <html lang="en">
