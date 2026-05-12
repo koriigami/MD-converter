@@ -3,7 +3,14 @@ const path = require('path');
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, convertInchesToTwip } = require('docx');
-const { marked } = require('marked');
+
+let marked;
+try {
+  marked = require('marked/lib/marked.cjs');
+} catch {
+  marked = require('marked').marked || require('marked').default;
+}
+
 const PRESETS = require('./presetConfig');
 const PALETTES = require('./paletteConfig');
 const TYPOGRAPHY = require('./typographyConfig');
