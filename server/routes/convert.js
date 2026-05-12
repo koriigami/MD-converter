@@ -1,31 +1,31 @@
 const express = require('express');
-const multer = require('multer');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const { convert, renderPreview } = require('../lib/converter');
-const { templates } = require('../lib/templateRegistry');
+const PRESETS = require('../lib/presetConfig');
 
 const router = express.Router();
-const upload = multer({ dest: os.tmpdir() });
 
-// List all available templates
-router.get('/templates', (req, res) => {
-  res.json(
-    templates.map(({ id, name, vibe, fonts, accent, accentLabel }) => ({
-      id, name, vibe, fonts, accent, accentLabel,
-    }))
-  );
+// List all available presets
+router.get('/presets', (req, res) => {
+  const presetList = Object.values(PRESETS).map(({ id, name, vibe, isDark }) => ({
+    id,
+    name,
+    vibe,
+    isDark,
+  }));
+  res.json(presetList);
 });
 
 // Live preview endpoint (returns full HTML)
 router.post('/preview', express.text({ type: 'text/plain', limit: '2mb' }), (req, res) => {
-  const { template = 'slate-pro' } = req.query;
+  const { preset = 'notion', palette, typography, accent } = req.query;
   const mdText = req.body;
   if (!mdText) return res.status(400).json({ error: 'No markdown text provided' });
 
   try {
-    const html = renderPreview(mdText, template);
+    const html = renderPreview(mdText, preset, palette, typography, accent);
     res.type('html').send(html);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -33,34 +33,30 @@ router.post('/preview', express.text({ type: 'text/plain', limit: '2mb' }), (req
 });
 
 // Main conversion endpoint
-router.post('/convert', upload.single('file'), async (req, res) => {
-  const { template = 'slate-pro', format = 'docx' } = req.body;
+router.post('/convert', express.urlencoded({ extended: false }), async (req, res) => {
+  const { text, preset = 'notion', palette, typography, accent, format = 'docx' } = req.body;
 
   if (!['docx', 'pdf'].includes(format)) {
     return res.status(400).json({ error: 'format must be "docx" or "pdf"' });
   }
 
-  let inputPath;
-  let cleanupInput = false;
-
-  if (req.file) {
-    // Uploaded file
-    inputPath = req.file.path;
-    cleanupInput = true;
-  } else if (req.body.text) {
-    // Pasted text — write to temp file
-    inputPath = path.join(os.tmpdir(), `md-${Date.now()}.md`);
-    fs.writeFileSync(inputPath, req.body.text, 'utf8');
-    cleanupInput = true;
-  } else {
-    return res.status(400).json({ error: 'Provide a file upload or text field' });
+  if (!text || text.trim().length === 0) {
+    return res.status(400).json({ error: 'No markdown text provided' });
   }
 
   const ext = format === 'docx' ? 'docx' : 'pdf';
   const outputPath = path.join(os.tmpdir(), `converted-${Date.now()}.${ext}`);
 
   try {
-    await convert({ inputPath, templateId: template, format, outputPath });
+    await convert({
+      mdText: text,
+      presetId: preset,
+      paletteId: palette,
+      typographyId: typography,
+      accent,
+      format,
+      outputPath,
+    });
 
     const mimeType = format === 'docx'
       ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -74,10 +70,8 @@ router.post('/convert', upload.single('file'), async (req, res) => {
 
     res.on('finish', () => {
       fs.rmSync(outputPath, { force: true });
-      if (cleanupInput) fs.rmSync(inputPath, { force: true });
     });
   } catch (err) {
-    if (cleanupInput) fs.rmSync(inputPath, { force: true });
     res.status(500).json({ error: err.message });
   }
 });

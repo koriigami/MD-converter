@@ -1,92 +1,253 @@
 /* global state */
-let TEMPLATES = [];
+let PRESETS = {};
+let PALETTES = {};
+let TYPOGRAPHY = {};
 const state = {
-  templateId: 'slate-pro',
+  presetId: 'notion',
+  paletteId: null,
+  typographyId: null,
+  accent: null,
   format: 'docx',
   mdText: '',
   converting: false,
 };
 
 let previewTimer = null;
+const STORAGE_KEY = 'md-converter-state';
 
 // ── Bootstrap ──────────────────────────────────────────────
 async function init() {
   try {
-    const res = await fetch('/api/templates');
-    TEMPLATES = await res.json();
+    const res = await fetch('/api/presets');
+    PRESETS = await res.json();
+    PRESETS = PRESETS.reduce((map, p) => ({ ...map, [p.id]: p }), {});
   } catch {
     setStatus('Could not reach server', 'error');
     return;
   }
 
-  renderStrip();
+  // Load saved state from localStorage
+  loadState();
+
+  renderPresetsList();
+  renderCustomizeControls();
   bindEvents();
-  applyAccent(currentTemplate());
-  updateWordmarkDoc();
+  updatePreviewName();
   renderEmptyPreview();
-}
-
-function currentTemplate() {
-  return TEMPLATES.find((t) => t.id === state.templateId) || TEMPLATES[0];
-}
-
-// ── Template strip ─────────────────────────────────────────
-function renderStrip() {
-  const strip = document.getElementById('templateStrip');
-  strip.innerHTML = TEMPLATES.map((t) => `
-    <div
-      class="template-card${t.id === state.templateId ? ' selected' : ''}"
-      data-id="${t.id}"
-      style="--card-accent:${t.accent}"
-      title="${t.vibe}"
-    >
-      <div class="card-name">${t.name}</div>
-      <div class="card-fonts">${t.fonts}</div>
-      <div class="card-vibe">${t.vibe}</div>
-    </div>
-  `).join('');
-
-  strip.querySelectorAll('.template-card').forEach((card) => {
-    card.addEventListener('click', () => selectTemplate(card.dataset.id));
-  });
-}
-
-function selectTemplate(id) {
-  state.templateId = id;
-  document.querySelectorAll('.template-card').forEach((c) => {
-    c.classList.toggle('selected', c.dataset.id === id);
-  });
-  const t = currentTemplate();
-  applyAccent(t);
-  updateWordmarkDoc();
   schedulePreview(0);
 }
 
-function applyAccent(t) {
-  if (!t) return;
-  // Use uiAccent (brighter version) for UI chrome, accent for doc color swatch
-  const uiColor = t.uiAccent || t.accent;
-  document.documentElement.style.setProperty('--accent', uiColor);
-}
-
-function updateWordmarkDoc() {
-  const t = currentTemplate();
-  const el = document.getElementById('wordmarkDoc');
-  if (el && t) {
-    el.textContent = state.format === 'pdf' ? 'PDF' : 'DOCX';
+function loadState() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      state.presetId = parsed.presetId || 'notion';
+      state.paletteId = parsed.paletteId || null;
+      state.typographyId = parsed.typographyId || null;
+      state.accent = parsed.accent || null;
+      state.format = parsed.format || 'docx';
+    } catch {
+      // Invalid JSON, use defaults
+    }
   }
-  const nameEl = document.getElementById('previewTemplateName');
-  if (nameEl && t) nameEl.textContent = t.name;
 }
 
-// ── Events ─────────────────────────────────────────────────
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    presetId: state.presetId,
+    paletteId: state.paletteId,
+    typographyId: state.typographyId,
+    accent: state.accent,
+    format: state.format,
+  }));
+}
+
+// ── Preset rendering ───────────────────────────────────────
+function renderPresetsList() {
+  const list = document.getElementById('presetsList');
+  list.innerHTML = Object.values(PRESETS).map((preset) => {
+    const isSelected = preset.id === state.presetId ? ' selected' : '';
+    return `
+      <button
+        class="preset-item${isSelected}"
+        data-preset-id="${preset.id}"
+      >
+        <div class="preset-thumbnail"
+             style="
+               --preset-bg: ${getPresetPaletteBg(preset.id)};
+               --preset-accent: ${getPresetAccent(preset.id)};
+               --preset-text: ${getPresetText(preset.id)};
+             "
+        >
+          <div class="thumbnail-stripe"></div>
+          <div class="thumbnail-lines">
+            <div class="thumbnail-line"></div>
+            <div class="thumbnail-line"></div>
+          </div>
+        </div>
+        <div class="preset-info">
+          <span class="preset-name">${preset.name}</span>
+          <span class="preset-vibe">${preset.vibe}</span>
+        </div>
+      </button>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.preset-item').forEach((btn) => {
+    btn.addEventListener('click', () => selectPreset(btn.dataset.presetId));
+  });
+}
+
+function selectPreset(presetId) {
+  state.presetId = presetId;
+  state.paletteId = null;
+  state.typographyId = null;
+  state.accent = null;
+  saveState();
+  renderPresetsList();
+  renderCustomizeControls();
+  updatePreviewName();
+  schedulePreview(0);
+}
+
+function getPresetPaletteBg(presetId) {
+  // Hardcoded palette backgrounds for mini-thumbnails
+  const paletteMap = {
+    notion: '#F8F8F8', medium: '#FBF8F3', linear: '#1E232B', github: '#F5F7FA',
+    stripe: '#FFFFFF', substack: '#FDF6EC', ia_writer: '#FFFFFF', obsidian: '#0F1117',
+    latex: '#FFFFFF', hbr: '#FBF8F3', dropbox_paper: '#FFFFFF', ghost: '#FFFFFF',
+    vercel: '#0F1117', framer: '#F8F8F8', figma_docs: '#F5F7FA',
+  };
+  return paletteMap[presetId] || '#FFFFFF';
+}
+
+function getPresetAccent(presetId) {
+  // Hardcoded accents for mini-thumbnails
+  const accentMap = {
+    notion: '#666666', medium: '#000000', linear: '#7C3AED', github: '#0969DA',
+    stripe: '#5469D4', substack: '#FF6A00', ia_writer: '#4A90E2', obsidian: '#7C3AED',
+    latex: '#000000', hbr: '#CC0000', dropbox_paper: '#0061FF', ghost: '#15171A',
+    vercel: '#FFFFFF', framer: '#A78BFA', figma_docs: '#000000',
+  };
+  return accentMap[presetId] || '#666666';
+}
+
+function getPresetText(presetId) {
+  // Text color (body) for mini-thumbnail lines
+  const isDarkPreset = ['linear', 'obsidian', 'vercel'].includes(presetId);
+  return isDarkPreset ? '#EAEAEA' : '#1A1A1A';
+}
+
+// ── Customize controls rendering ────────────────────────────
+function renderCustomizeControls() {
+  renderPaletteSwatches();
+  renderTypographyPills();
+  renderAccentSwatches();
+}
+
+function renderPaletteSwatches() {
+  const container = document.getElementById('paletteSwatches');
+  const palettes = [
+    { id: 'paper', bg: '#FFFFFF' },
+    { id: 'ivory', bg: '#FBF8F3' },
+    { id: 'sand', bg: '#FDF6EC' },
+    { id: 'frost', bg: '#F5F7FA' },
+    { id: 'chalk', bg: '#F8F8F8' },
+    { id: 'slate', bg: '#1E232B' },
+    { id: 'carbon', bg: '#1A1A1A' },
+    { id: 'ink', bg: '#0F1117' },
+  ];
+
+  container.innerHTML = palettes.map((p) => {
+    const isSelected = state.paletteId === p.id ? ' selected' : '';
+    return `
+      <button
+        class="palette-swatch${isSelected}"
+        data-palette-id="${p.id}"
+        style="background: ${p.bg};"
+        title="${p.id}"
+      ></button>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.palette-swatch').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.paletteId = btn.dataset.paletteId;
+      saveState();
+      renderPaletteSwatches();
+      schedulePreview(0);
+    });
+  });
+}
+
+function renderTypographyPills() {
+  const container = document.getElementById('typographyPills');
+  const typographies = [
+    'humanist', 'editorial', 'technical', 'academic',
+    'expressive', 'geometric', 'classic', 'modern_serif',
+  ];
+
+  container.innerHTML = typographies.map((t) => {
+    const label = t.charAt(0).toUpperCase() + t.slice(1).replace('_', ' ');
+    const isSelected = state.typographyId === t ? ' selected' : '';
+    return `
+      <button
+        class="typography-pill${isSelected}"
+        data-typography-id="${t}"
+        title="${t}"
+      >${label}</button>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.typography-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.typographyId = btn.dataset.typographyId;
+      saveState();
+      renderTypographyPills();
+      schedulePreview(0);
+    });
+  });
+}
+
+function renderAccentSwatches() {
+  const container = document.getElementById('accentSwatches');
+  const accents = [
+    '#666666', '#000000', '#7C3AED', '#0969DA',
+    '#5469D4', '#FF6A00', '#4A90E2', '#CC0000',
+    '#0061FF', '#15171A',
+  ];
+
+  container.innerHTML = accents.map((a) => {
+    const isSelected = state.accent === a ? ' selected' : '';
+    return `
+      <button
+        class="accent-swatch${isSelected}"
+        data-accent="${a}"
+        style="background: ${a};"
+        title="${a}"
+      ></button>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.accent-swatch').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.accent = btn.dataset.accent;
+      saveState();
+      renderAccentSwatches();
+      schedulePreview(0);
+    });
+  });
+}
+
+// ── Event binding ──────────────────────────────────────────
 function bindEvents() {
-  const input    = document.getElementById('mdInput');
+  const input = document.getElementById('mdInput');
   const fileInput = document.getElementById('fileInput');
-  const dropZone  = document.getElementById('dropZone');
-  const overlay   = document.getElementById('dropOverlay');
-  const btnDocx   = document.getElementById('btnDocx');
-  const btnPdf    = document.getElementById('btnPdf');
+  const dropZone = document.getElementById('dropZone');
+  const overlay = document.getElementById('dropOverlay');
+  const btnDocx = document.getElementById('btnDocx');
+  const btnPdf = document.getElementById('btnPdf');
 
   // Typing
   input.addEventListener('input', () => {
@@ -118,10 +279,17 @@ function bindEvents() {
 
   // Format toggle
   btnDocx.addEventListener('click', () => setFormat('docx'));
-  btnPdf.addEventListener('click',  () => setFormat('pdf'));
+  btnPdf.addEventListener('click', () => setFormat('pdf'));
 
-  // Convert
+  // Convert button
   document.getElementById('convertBtn').addEventListener('click', triggerConvert);
+
+  // Keyboard shortcut: Cmd+Enter / Ctrl+Enter
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !state.converting) {
+      triggerConvert();
+    }
+  });
 }
 
 function readFile(file) {
@@ -138,11 +306,11 @@ function readFile(file) {
 function setFormat(fmt) {
   state.format = fmt;
   document.getElementById('btnDocx').classList.toggle('active', fmt === 'docx');
-  document.getElementById('btnPdf').classList.toggle('active',  fmt === 'pdf');
-  updateWordmarkDoc();
+  document.getElementById('btnPdf').classList.toggle('active', fmt === 'pdf');
+  saveState();
 }
 
-// ── Preview ─────────────────────────────────────────────────
+// ── Preview ────────────────────────────────────────────────
 function schedulePreview(delay) {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(updatePreview, delay);
@@ -153,12 +321,21 @@ async function updatePreview() {
     renderEmptyPreview();
     return;
   }
+
   try {
-    const res = await fetch(`/api/preview?template=${state.templateId}`, {
+    const params = new URLSearchParams({
+      preset: state.presetId,
+      ...(state.paletteId && { palette: state.paletteId }),
+      ...(state.typographyId && { typography: state.typographyId }),
+      ...(state.accent && { accent: state.accent }),
+    });
+
+    const res = await fetch(`/api/preview?${params}`, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: state.mdText,
     });
+
     if (!res.ok) return;
     const html = await res.text();
     document.getElementById('previewFrame').srcdoc = html;
@@ -180,7 +357,18 @@ function renderEmptyPreview() {
   </body></html>`;
 }
 
-// ── Convert ─────────────────────────────────────────────────
+function updatePreviewName() {
+  const preset = PRESETS[state.presetId];
+  const nameEl = document.getElementById('previewPresetName');
+  if (nameEl && preset) {
+    const label = state.paletteId || state.typographyId || state.accent
+      ? `${preset.name} (customized)`
+      : preset.name;
+    nameEl.textContent = label;
+  }
+}
+
+// ── Convert ────────────────────────────────────────────────
 async function triggerConvert() {
   if (state.converting) return;
   if (!state.mdText.trim()) {
@@ -193,9 +381,12 @@ async function triggerConvert() {
 
   try {
     const body = new FormData();
-    body.append('text',     state.mdText);
-    body.append('template', state.templateId);
-    body.append('format',   state.format);
+    body.append('text', state.mdText);
+    body.append('preset', state.presetId);
+    if (state.paletteId) body.append('palette', state.paletteId);
+    if (state.typographyId) body.append('typography', state.typographyId);
+    if (state.accent) body.append('accent', state.accent);
+    body.append('format', state.format);
 
     const res = await fetch('/api/convert', { method: 'POST', body });
 
@@ -205,10 +396,10 @@ async function triggerConvert() {
     }
 
     const blob = await res.blob();
-    const ext  = state.format;
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
+    const ext = state.format;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
     a.download = `document.${ext}`;
     a.click();
     URL.revokeObjectURL(url);
@@ -223,18 +414,18 @@ async function triggerConvert() {
 
 function setConverting(on) {
   state.converting = on;
-  const btn     = document.getElementById('convertBtn');
-  const label   = document.getElementById('convertLabel');
+  const btn = document.getElementById('convertBtn');
+  const label = document.getElementById('convertLabel');
   const spinner = document.getElementById('convertSpinner');
-  btn.disabled         = on;
-  label.textContent    = on ? 'Converting…' : 'Convert & Download';
-  spinner.hidden       = !on;
+  btn.disabled = on;
+  label.textContent = on ? 'Converting…' : 'Convert & Download';
+  spinner.hidden = !on;
 }
 
 function setStatus(msg, type) {
   const el = document.getElementById('statusMsg');
-  el.textContent  = msg;
-  el.className    = 'status-msg' + (type ? ` ${type}` : '');
+  el.textContent = msg;
+  el.className = 'status-msg' + (type ? ` ${type}` : '');
   if (type === 'success' || type === 'error') {
     setTimeout(() => { el.textContent = ''; el.className = 'status-msg'; }, 4500);
   }

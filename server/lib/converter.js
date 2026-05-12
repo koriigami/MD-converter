@@ -4,32 +4,47 @@ const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, convertInchesToTwip } = require('docx');
 const { marked } = require('marked');
-const { getTemplate } = require('./templateRegistry');
+const PRESETS = require('./presetConfig');
+const PALETTES = require('./paletteConfig');
+const TYPOGRAPHY = require('./typographyConfig');
+const { composeCss } = require('./cssComposer');
 
 /**
  * Convert a markdown file to DOCX or PDF.
  * @param {object} opts
- * @param {string} opts.inputPath   - Absolute path to input .md file
- * @param {string} opts.templateId  - Template name (e.g. 'slate-pro')
+ * @param {string} opts.mdText      - Markdown text content
+ * @param {string} opts.presetId    - Preset name (e.g. 'notion')
+ * @param {string} [opts.paletteId] - Override palette (optional)
+ * @param {string} [opts.typographyId] - Override typography (optional)
+ * @param {string} [opts.accent]    - Override accent color (optional)
  * @param {'docx'|'pdf'} opts.format
- * @param {string} opts.outputPath  - Absolute path for output file
+ * @param {string} [opts.outputPath] - For file output (optional for preview)
  */
-async function convert({ inputPath, templateId, format, outputPath }) {
-  const template = getTemplate(templateId);
+async function convert({ mdText, presetId, paletteId, typographyId, accent, format, outputPath }) {
+  const preset = PRESETS[presetId];
+  if (!preset) {
+    throw new Error(`Unknown preset: ${presetId}`);
+  }
+
+  // Resolve effective palette, typography, accent (overrides take precedence)
+  const effectivePaletteId = paletteId || preset.paletteId;
+  const effectiveTypographyId = typographyId || preset.typographyId;
+  const effectiveAccent = accent || preset.accent;
+  const isDark = preset.isDark;
 
   if (format === 'docx') {
-    return convertToDocx({ inputPath, template, outputPath });
+    return convertToDocx({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath });
   } else if (format === 'pdf') {
-    return convertToPdf({ inputPath, template, outputPath });
+    return convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath });
   } else {
     throw new Error(`Unsupported format: "${format}"`);
   }
 }
 
-async function convertToDocx({ inputPath, template, outputPath }) {
-  const mdText = fs.readFileSync(inputPath, 'utf8');
+async function convertToDocx({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath }) {
   const tokens = marked.lexer(mdText);
-  const primaryFont = template.fonts.split('+')[0].trim();
+  const typography = TYPOGRAPHY[effectiveTypographyId];
+  const primaryFont = typography.bodyFont.replace(/['\"]/g, '');
 
   // Parse markdown tokens into Word paragraphs
   const paragraphs = [];
@@ -76,9 +91,13 @@ async function convertToDocx({ inputPath, template, outputPath }) {
   fs.writeFileSync(outputPath, buffer);
 }
 
-async function convertToPdf({ inputPath, template, outputPath }) {
-  const mdText = fs.readFileSync(inputPath, 'utf8');
-  const css = fs.readFileSync(template.cssPath, 'utf8');
+async function convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath }) {
+  const css = composeCss({
+    paletteId: effectivePaletteId,
+    typographyId: effectiveTypographyId,
+    accent: effectiveAccent,
+    isDark,
+  });
   const bodyHtml = marked.parse(mdText);
   const styledHtml = `<!DOCTYPE html><html><head><style>${css}</style></head><body class="preview-body"><div class="doc-content">${bodyHtml}</div></body></html>`;
 
@@ -106,12 +125,29 @@ async function convertToPdf({ inputPath, template, outputPath }) {
 /**
  * Render markdown as HTML string (for live preview in the web UI).
  * @param {string} mdText
- * @param {string} templateId
- * @returns {string} Full HTML with template CSS injected
+ * @param {string} presetId
+ * @param {string} [paletteId] - Optional palette override
+ * @param {string} [typographyId] - Optional typography override
+ * @param {string} [accent] - Optional accent override
+ * @returns {string} Full HTML with composed CSS injected
  */
-function renderPreview(mdText, templateId) {
-  const template = getTemplate(templateId);
-  const css = fs.readFileSync(template.cssPath, 'utf8');
+function renderPreview(mdText, presetId, paletteId, typographyId, accent) {
+  const preset = PRESETS[presetId];
+  if (!preset) {
+    return `<html><body style="color: red;">Error: Unknown preset ${presetId}</body></html>`;
+  }
+
+  const effectivePaletteId = paletteId || preset.paletteId;
+  const effectiveTypographyId = typographyId || preset.typographyId;
+  const effectiveAccent = accent || preset.accent;
+
+  const css = composeCss({
+    paletteId: effectivePaletteId,
+    typographyId: effectiveTypographyId,
+    accent: effectiveAccent,
+    isDark: preset.isDark,
+  });
+
   const bodyHtml = marked.parse(mdText);
 
   return `<!DOCTYPE html>

@@ -11,33 +11,63 @@
 <body>
   <div class="app">
 
-    <header class="header">
-      <div class="wordmark">
-        <span class="wordmark-md">MD</span>
-        <span class="wordmark-arrow">→</span>
-        <span class="wordmark-doc" id="wordmarkDoc">Doc</span>
+    <!-- SIDEBAR (240px) -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="wordmark">
+          <span class="wordmark-md">MD</span>
+          <span class="wordmark-arrow">→</span>
+          <span class="wordmark-doc">Doc</span>
+        </div>
       </div>
-      <span class="header-badge">20 styles</span>
-    </header>
 
-    <section class="strip-wrapper">
-      <div class="strip-fade-left"></div>
-      <div class="template-strip" id="templateStrip">
-        <!-- Populated by app.js -->
-      </div>
-      <div class="strip-fade-right"></div>
-    </section>
+      <!-- PRESETS LIST -->
+      <section class="presets-section">
+        <h3 class="section-label">Presets</h3>
+        <div class="presets-list" id="presetsList">
+          <!-- Populated by app.js -->
+        </div>
+      </section>
 
-    <main class="editor-area">
+      <!-- CUSTOMIZE SECTION -->
+      <section class="customize-section">
+        <h3 class="section-label">Customize</h3>
+
+        <div class="customize-group">
+          <label class="customize-label">Color</label>
+          <div class="palette-swatches" id="paletteSwatches">
+            <!-- Populated by app.js -->
+          </div>
+        </div>
+
+        <div class="customize-group">
+          <label class="customize-label">Font</label>
+          <div class="typography-pills" id="typographyPills">
+            <!-- Populated by app.js -->
+          </div>
+        </div>
+
+        <div class="customize-group">
+          <label class="customize-label">Accent</label>
+          <div class="accent-swatches" id="accentSwatches">
+            <!-- Populated by app.js -->
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <div class="main-content">
+      <!-- EDITOR PANE -->
       <div class="editor-pane">
         <div class="pane-header">
           <span class="pane-label">Markdown</span>
           <label class="upload-btn" title="Upload .md file">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a.5.5 0 0 1 .5.5v9.793l2.146-2.147a.5.5 0 0 1 .708.708l-3 3a.5.5 0 0 1-.708 0l-3-3a.5.5 0 0 1 .708-.708L7.5 11.293V1.5A.5.5 0 0 1 8 1z"/>
-              <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+              <path d="M8 15a.5.5 0 0 1-.5-.5V4.707L5.354 7.354a.5.5 0 0 1-.708-.708l3-3a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1-.708.708L8.5 4.707V14.5a.5.5 0 0 1-.5.5z"/>
+              <path d="M14.5 6a.5.5 0 0 1 .5.5v2.5a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 1 0v2.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 .5-.5z"/>
             </svg>
-            Upload file
+            Upload
             <input type="file" accept=".md,.markdown,.txt" id="fileInput" hidden>
           </label>
         </div>
@@ -55,34 +85,35 @@
         </div>
       </div>
 
-      <div class="pane-divider" id="paneDivider"></div>
-
+      <!-- PREVIEW PANE -->
       <div class="preview-pane">
         <div class="pane-header">
           <span class="pane-label">Preview</span>
-          <span class="preview-template-name" id="previewTemplateName"></span>
+          <span class="preview-preset-name" id="previewPresetName"></span>
         </div>
         <iframe class="preview-frame" id="previewFrame" title="Document preview" sandbox="allow-same-origin"></iframe>
       </div>
-    </main>
-
-    <footer class="bottom-bar">
-      <div class="format-toggle" role="group" aria-label="Output format">
-        <button class="fmt-btn active" data-format="docx" id="btnDocx">DOCX</button>
-        <button class="fmt-btn" data-format="pdf" id="btnPdf">PDF</button>
-      </div>
-
-      <p class="status-msg" id="statusMsg" aria-live="polite"></p>
-
-      <button class="convert-btn" id="convertBtn" aria-label="Convert and download">
-        <span id="convertLabel">Convert &amp; Download</span>
-        <svg class="spinner" id="convertSpinner" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" hidden>
-          <path d="M10 2a8 8 0 1 0 6 2.93" stroke-linecap="round"/>
-        </svg>
-      </button>
-    </footer>
+    </div>
 
   </div>
+
+  <!-- BOTTOM ACTION BAR (spans full width) -->
+  <footer class="action-bar">
+    <div class="format-toggle" role="group" aria-label="Output format">
+      <button class="fmt-btn active" data-format="docx" id="btnDocx">DOCX</button>
+      <button class="fmt-btn" data-format="pdf" id="btnPdf">PDF</button>
+    </div>
+
+    <p class="status-msg" id="statusMsg" aria-live="polite"></p>
+
+    <button class="convert-btn" id="convertBtn" aria-label="Convert and download">
+      <span id="convertLabel">Convert &amp; Download</span>
+      <svg class="spinner" id="convertSpinner" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" hidden>
+        <path d="M10 2a8 8 0 1 0 6 2.93" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </footer>
+
   <script src="app.js"></script>
 </body>
 </html>
