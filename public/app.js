@@ -17,23 +17,25 @@ const STORAGE_KEY = 'md-converter-state';
 
 // ── Bootstrap ──────────────────────────────────────────────
 async function init() {
+  // Always load state and bind events first — UI should be interactive regardless of API
+  loadState();
+  renderCustomizeControls();
+  bindEvents();
+  renderEmptyPreview();
+
+  // Then load presets asynchronously — presets are data, not infrastructure
   try {
     const res = await fetch('/api/presets');
-    PRESETS = await res.json();
-    PRESETS = PRESETS.reduce((map, p) => ({ ...map, [p.id]: p }), {});
-  } catch {
-    setStatus('Could not reach server', 'error');
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const data = await res.json();
+    PRESETS = data.reduce((map, p) => ({ ...map, [p.id]: p }), {});
+  } catch (err) {
+    setStatus('Could not load presets', 'error');
     return;
   }
 
-  // Load saved state from localStorage
-  loadState();
-
   renderPresetsList();
-  renderCustomizeControls();
-  bindEvents();
   updatePreviewName();
-  renderEmptyPreview();
   schedulePreview(0);
 }
 
