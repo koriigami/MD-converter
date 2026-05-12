@@ -4,12 +4,28 @@ const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, convertInchesToTwip } = require('docx');
 
-let marked;
+let markedModule;
 try {
-  marked = require('marked/lib/marked.cjs');
-} catch {
-  marked = require('marked').marked || require('marked').default;
+  markedModule = require('marked');
+  // Try to get the parse function - it might be the default export or under .default or .marked
+} catch (err) {
+  throw new Error(`Failed to load marked: ${err.message}`);
 }
+
+const marked = {
+  parse: (text) => {
+    if (typeof markedModule.parse === 'function') {
+      return markedModule.parse(text);
+    } else if (typeof markedModule.default?.parse === 'function') {
+      return markedModule.default.parse(text);
+    } else if (typeof markedModule === 'function') {
+      return markedModule(text);
+    } else if (typeof markedModule.default === 'function') {
+      return markedModule.default(text);
+    }
+    throw new Error('Cannot find marked.parse function');
+  }
+};
 
 const PRESETS = require('./presetConfig');
 const PALETTES = require('./paletteConfig');
