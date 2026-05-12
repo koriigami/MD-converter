@@ -380,7 +380,7 @@ async function triggerConvert() {
   setStatus('Converting…');
 
   try {
-    const body = new FormData();
+    const body = new URLSearchParams();
     body.append('text', state.mdText);
     body.append('preset', state.presetId);
     if (state.paletteId) body.append('palette', state.paletteId);
@@ -388,7 +388,11 @@ async function triggerConvert() {
     if (state.accent) body.append('accent', state.accent);
     body.append('format', state.format);
 
-    const res = await fetch('/api/convert', { method: 'POST', body });
+    const res = await fetch('/api/convert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
 
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: 'Conversion failed' }));
