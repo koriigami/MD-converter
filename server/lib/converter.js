@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, convertInchesToTwip } = require('docx');
+const HTMLtoDOCX = require('html-to-docx');
 
 const PRESETS = require('./presetConfig');
 const PALETTES = require('./paletteConfig');
@@ -41,7 +41,7 @@ async function convert({ mdText, presetId, paletteId, typographyId, accent, form
   const isDark = preset.isDark;
 
   if (format === 'docx') {
-    return convertToDocx({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath });
+    return convertToDocx({ mdText, effectiveTypographyId, outputPath });
   } else if (format === 'pdf') {
     return convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath });
   } else {
@@ -49,55 +49,35 @@ async function convert({ mdText, presetId, paletteId, typographyId, accent, form
   }
 }
 
-async function convertToDocx({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath }) {
+// Maps each typography preset to the best Word-compatible system fonts
+const DOCX_FONT_MAP = {
+  editorial:    'Georgia',
+  academic:     'Times New Roman',
+  classic:      'Book Antiqua',
+  modern_serif: 'Georgia',
+  humanist:     'Calibri',
+  geometric:    'Trebuchet MS',
+  technical:    'Calibri',
+  expressive:   'Verdana',
+};
+
+async function convertToDocx({ mdText, effectiveTypographyId, outputPath }) {
   const markedModule = await getMarked();
-  const tokens = markedModule.lexer(mdText);
-  const typography = TYPOGRAPHY[effectiveTypographyId];
-  const primaryFont = typography.bodyFont.replace(/['\"]/g, '');
+  const bodyHtml = markedModule.parse(mdText);
 
-  // Parse markdown tokens into Word paragraphs
-  const paragraphs = [];
-  for (const token of tokens) {
-    if (token.type === 'heading') {
-      const level = token.depth === 1 ? HeadingLevel.HEADING_1 : token.depth === 2 ? HeadingLevel.HEADING_2 : HeadingLevel.HEADING_3;
-      paragraphs.push(new Paragraph({
-        text: token.text,
-        heading: level,
-        spacing: { after: 200 },
-      }));
-    } else if (token.type === 'paragraph') {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: token.text, font: primaryFont })],
-        spacing: { after: 100 },
-      }));
-    } else if (token.type === 'list') {
-      for (const item of token.items) {
-        paragraphs.push(new Paragraph({
-          children: [new TextRun({ text: `• ${item.text}`, font: primaryFont })],
-          spacing: { after: 50 },
-        }));
-      }
-    } else if (token.type === 'code') {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: token.text, font: 'Courier New' })],
-        spacing: { after: 100 },
-      }));
-    }
-  }
+  const font = DOCX_FONT_MAP[effectiveTypographyId] || 'Calibri';
 
-  const doc = new Document({
-    sections: [{
-      properties: {
-        page: {
-          margins: { top: convertInchesToTwip(1), bottom: convertInchesToTwip(1), left: convertInchesToTwip(1), right: convertInchesToTwip(1) },
-        },
-      },
-      children: paragraphs.length > 0 ? paragraphs : [new Paragraph('Empty document')],
-    }],
+  const fileBuffer = await HTMLtoDOCX(bodyHtml, null, {
+    table:      { row: { cantSplit: true } },
+    footer:     false,
+    header:     false,
+    pageNumber: false,
+    font,
+    fontSize:   22,
+    margins:    { top: 1440, bottom: 1440, left: 1800, right: 1800 },
   });
 
-  const buffer = await Packer.toBuffer(doc);
-  fs.writeFileSync(outputPath, buffer);
+  fs.writeFileSync(outputPath, fileBuffer);
 }
 
 async function convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTypographyId, effectiveAccent, isDark, outputPath }) {
@@ -109,7 +89,7 @@ async function convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTyp
   });
   const markedModule = await getMarked();
   const bodyHtml = markedModule.parse(mdText);
-  const styledHtml = `<!DOCTYPE html><html><head><style>${css}</style></head><body class="preview-body"><div class="doc-content">${bodyHtml}</div></body></html>`;
+  const styledHtml = `<!DOCTYPE html><html><head><style>${css}\n@page { margin: 15mm 0; }</style></head><body class="preview-body"><div class="doc-content">${bodyHtml}</div></body></html>`;
 
   const browser = await puppeteer.launch({
     args: chromium.args,
@@ -124,7 +104,7 @@ async function convertToPdf({ mdText, presetId, effectivePaletteId, effectiveTyp
     await page.pdf({
       path: outputPath,
       format: 'A4',
-      margin: { top: '20mm', right: '20mm', bottom: '20mm', left: '20mm' },
+      margin: { top: '0', right: '0', bottom: '0', left: '0' },
       printBackground: true,
     });
   } finally {

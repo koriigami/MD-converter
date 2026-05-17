@@ -19,13 +19,13 @@ router.get('/presets', (req, res) => {
 });
 
 // Live preview endpoint (returns full HTML)
-router.post('/preview', express.text({ type: 'text/plain', limit: '2mb' }), (req, res) => {
+router.post('/preview', express.text({ type: 'text/plain', limit: '2mb' }), async (req, res) => {
   const { preset = 'notion', palette, typography, accent } = req.query;
   const mdText = req.body;
   if (!mdText) return res.status(400).json({ error: 'No markdown text provided' });
 
   try {
-    const html = renderPreview(mdText, preset, palette, typography, accent);
+    const html = await renderPreview(mdText, preset, palette, typography, accent);
     res.type('html').send(html);
   } catch (err) {
     res.status(400).json({ error: err.message });
